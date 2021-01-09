@@ -1,87 +1,82 @@
-{
 #Persistent
-#SingleInstance Force
-
-SM_CMONITORS := 80 ; 'number of desktop monitors' attribute id
-SysGet, monitor_num, % SM_CMONITORS
-
-x_max := 0
-x_min := 0
-
-Loop, % monitor_num {
-	SysGet, monitor_bounds, Monitor, %A_index%
-	if (monitor_boundsLeft < x_min)
-		x_min := monitor_boundsLeft
-	if (monitor_boundsRight > x_max)
-		x_max := monitor_boundsRight
-}
-
+DllCall("SetThreadDpiAwarenessContext", "ptr", -3, "ptr")
 CoordMode, Mouse, Screen
 
-edge_pixels = 2
+; ################# User settings - adjust these to match your monitor configuration ##############
 
-SetTimer, detect_edge, 100
+edge_spacing := 3
+heights := [0, 0, 0]					; distances from the screen top in cm
+scales := [33.5 / 1080, 39.4 / 2160, 33.5 / 1080]	; height in cm / height in pixels
 
-; ---------------------------------------------
 
-left_mon_height_cm := 50
-left_mon_elev_cm := 4.1
-right_mon_height_cm := 33.62
-h_px := 1080
-w_px := 1920
-MouseGetPos, pre_switchx
 
-;SetTimer, detect_switch, 10
+; ################# Initialize script #############################################################
 
+
+SysGet, monitor_num, MonitorCount
+nexts := []
+lefts := []
+rights := []
+Loop, %monitor_num% {
+	nexts.Push(Mod(A_Index, monitor_num) + 1)
+	SysGet, bounds, Monitor, %A_Index%
+	lefts.Push(boundsLeft)
+	rights.Push(boundsRight)
 }
-return
+bubble_sort(lefts)
+bubble_sort(rights)
 
-detect_edge:
-MouseGetPos, x, y
+MouseGetPos, prev_mx, prev_my
+SetTimer, transition_timer, 10
 
-if (x > x_max - edge_pixels) {
-	MouseMove, x_min + edge_pixels, y, 0
-	ToolTip,  x_min = %x_min%
-}
-
-if(x < x_min + edge_pixels) {
-	MouseMove, x_max - edge_pixels, y, 0
-}
-
-return
-
-
-detect_switch:
-MouseGetPos, curr_switchx, curr_switchy
-if(abs(pre_switchx - curr_switchx) < 100) {
-	if (pre_switchx >= 0 && curr_switchx < 0) {
-		new_switchy := (left_mon_height_cm + left_mon_elev_cm - (1 - curr_switchy / h_px) * right_mon_height_cm) * h_px / left_mon_height_cm
-		new_switchy := min(h_px, max(0, floor(new_switchy)))
-		if (GetKeyState("LButton") == 0) {
-			switch_notok := true
-			while (switch_notok) {
-				MouseMove, curr_switchx, new_switchy, 0
-				MouseGetPos, confirm_switchx, confirm_switchy
-				switch_notok := abs(confirm_switchy - new_switchy) > 20
-			}
-		}
-	} else if (pre_switchx < 0 && curr_switchx >= 0) {
-		new_switchy := (right_mon_height_cm - left_mon_elev_cm - (1 - curr_switchy / h_px) * left_mon_height_cm) * h_px / right_mon_height_cm
-		new_switchy := min(h_px, max(0, floor(new_switchy)))
-		if (GetKeyState("LButton") == 0) {
-			switch_notok := true
-			while (switch_notok) {
-				MouseMove, curr_switchx, new_switchy, 0
-				MouseGetPos, confirm_switchx, confirm_switchy
-				switch_notok := abs(confirm_switchy - new_switchy) > 20
+bubble_sort(arr) {
+	Loop, % arr.MaxIndex() - 1 {
+		Loop, % arr.MaxIndex() - A_Index {
+			j := A_Index
+			if (arr[j] > arr[j+1]) {
+				left := arr[j]
+				arr[j] := arr[j+1]
+				arr[j+1] := left
 			}
 		}
 	}
 }
-pre_switchx := curr_switchx
+
+
+
+; ################# Monitor & adjust mouse position ###############################################
+
+transition_timer:
+MouseGetPos, mx, my
+
+for curr, next in nexts {
+
+	; ##### left -> right #####
+	if (prev_mx < rights[curr] - edge_spacing && mx >= rights[curr] - edge_spacing) {
+		mx := lefts[next] + edge_spacing
+		my := (heights[curr] - heights[next] + scales[curr] * prev_my) / scales[next]
+		
+		MouseMove, mx, my, 0
+		BlockInput, Mouse
+	}
+
+	; ##### left <- right #####
+	if (prev_mx >= lefts[next] + edge_spacing && mx < lefts[next] + edge_spacing) {
+		mx := rights[curr] - edge_spacing
+		my := (heights[next] - heights[curr] + scales[next] * prev_my) / scales[curr]
+
+		MouseMove, mx, my, 0
+		BlockInput, Mouse
+	}
+}
+
+prev_mx := mx
+prev_my := my
+
 return
 
-; ---------------------------------------------
+
+; #################################################################################################
 
 ~^!r::
 Menu, Tray, Icon
