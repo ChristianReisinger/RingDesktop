@@ -6,14 +6,19 @@ CoordMode, Mouse, Screen
 ; NOTE: y = 0 is the top of the primary monitor
 
 edge_spacing := 3
-heights_cm := [5.7, 0, 5.7]				; distances from y = 0 in cm
-heights_px := [2130, 0, 2130]				; distances from y = 0 in pixels
-scales := [33.5 / 1080, 39.4 / 2160, 33.5 / 1080]	; height in cm / height in pixels
+shifts_cm := [5.7, 0, 5.7]				; distances from y = 0 in cm
+shifts_px := [2130, 0, 2130]				; distances from y = 0 in pixels
+heights_cm := [33.5, 39.4, 33.5]			; monitor height in cm
+heights_px := [1080, 2160, 1080]			; monitor height in pixels
 
 
 
 ; ################# Initialize script #############################################################
 
+scales := []
+Loop, % heights_cm.MaxIndex() {
+	scales.Push(heights_cm[A_Index] / heights_px[A_Index])
+}
 
 SysGet, monitor_num, MonitorCount
 nexts := []
@@ -66,7 +71,15 @@ for curr, next in nexts {
 	; ##### left -> right #####
 	if (prev_mx < rights[curr] - edge_spacing && mx >= rights[curr] - edge_spacing) {
 		mx := lefts[next] + edge_spacing
-		my := (heights_cm[curr] - heights_cm[next] + scales[curr] * (prev_my - heights_px[curr])) / scales[next] + heights_px[next]
+		my := (shifts_cm[curr] - shifts_cm[next] + scales[curr] * (prev_my - shifts_px[curr])) / scales[next] + shifts_px[next]
+
+		min_y := shifts_px[next]
+		max_y := shifts_px[next] + heights_px[next]
+		if (my < min_y) {
+			my := min_y
+		} else if (my > max_y) {
+			my := max_y
+		}
 		
 		MouseMove, mx, my, 0
 		BlockInput, Mouse
@@ -75,7 +88,15 @@ for curr, next in nexts {
 	; ##### left <- right #####
 	if (prev_mx >= lefts[next] + edge_spacing && mx < lefts[next] + edge_spacing) {
 		mx := rights[curr] - edge_spacing
-		my := (heights_cm[next] - heights_cm[curr] + scales[next] * (prev_my - heights_px[next])) / scales[curr] + heights_px[curr]
+		my := (shifts_cm[next] - shifts_cm[curr] + scales[next] * (prev_my - shifts_px[next])) / scales[curr] + shifts_px[curr]
+
+		min_y := shifts_px[curr]
+		max_y := shifts_px[curr] + heights_px[curr]
+		if (my < min_y) {
+			my := min_y
+		} else if (my > max_y) {
+			my := max_y
+		}
 
 		MouseMove, mx, my, 0
 		BlockInput, Mouse
