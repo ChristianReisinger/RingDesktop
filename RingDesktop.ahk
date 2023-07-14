@@ -3,13 +3,13 @@ DllCall("SetThreadDpiAwarenessContext", "ptr", -3, "ptr")
 CoordMode, Mouse, Screen
 
 ; ################# User settings - adjust these to match your monitor configuration ##############
-; NOTE: y = 0 is the top of the primary monitor
+; NOTE: y = 0 refers to the top of the primary monitor, y increases downwards
 
 edge_spacing := 3
-shifts_cm := [5.7, 0, 5.7]				; distances from y = 0 in cm
-shifts_px := [2130, 0, 2130]				; distances from y = 0 in pixels
-heights_cm := [33.5, 39.4, 33.5]			; monitor height in cm
-heights_px := [1080, 2160, 1080]			; monitor height in pixels
+shifts_cm := [7, 0, 0]				; distances from y = 0 in cm
+shifts_px := [2052, 0, 2052]			; distances from y = 0 in pixels (see NVidia control panel)
+heights_cm := [33.5, 39.4, 50.0]		; monitor height in cm
+heights_px := [1080, 2160, 1080]		; monitor height in pixels
 
 
 
@@ -49,16 +49,36 @@ bubble_sort(arr) {
 	}
 }
 
+BetterMouseMove(x, y) {
+	; MouseMove does not work properly across screens .. often it is not moved fully to the target position
+	; Waiting in a loop until the target position is reached also fails and causes random jumps
+	; Hack: repeating many calls works, but is very slow with MouseMove. DllCall instead is fast.
+	;
+	; Additional calls were added and tested until the target position is always reached and no unexpected jumps occur
+	
+	DllCall("SetCursorPos", "int", x, "int", y)
+	DllCall("SetCursorPos", "int", x, "int", y)
+	DllCall("SetCursorPos", "int", x, "int", y)
+	DllCall("SetCursorPos", "int", x, "int", y)
+	DllCall("SetCursorPos", "int", x, "int", y)
+	DllCall("SetCursorPos", "int", x, "int", y)
+	DllCall("SetCursorPos", "int", x, "int", y)
+}
+
 
 ; ###### print lefts / rights ######
-if(false) {
-lefts_str := ""
-rights_str := ""
-Loop, % lefts.MaxIndex() {
-	lefts_str .= "" . lefts[A_Index] . " "
-	rights_str .= "" . rights[A_Index] . " "
-}
-MsgBox, % lefts_str "`n" rights_str
+if (false) {
+	lefts_str := ""
+	rights_str := ""
+	Loop, % lefts.MaxIndex() {
+		lefts_str .= "" . lefts[A_Index] . " "
+		rights_str .= "" . rights[A_Index] . " "
+	}
+	nexts_str := ""
+	Loop, % nexts.MaxIndex() {
+		nexts_str .= "" . nexts[A_Index] . " "
+	}
+	MsgBox, % lefts_str "`n" rights_str "`n" nexts_str
 }
 
 ; ################# Monitor & adjust mouse position ###############################################
@@ -69,7 +89,8 @@ MouseGetPos, mx, my
 for curr, next in nexts {
 
 	; ##### left -> right #####
-	if (prev_mx < rights[curr] - edge_spacing && mx >= rights[curr] - edge_spacing) {
+	r := rights[curr] - edge_spacing	
+	if (prev_mx < r && r <= mx) {
 		mx := lefts[next] + edge_spacing
 		my := (shifts_cm[curr] - shifts_cm[next] + scales[curr] * (prev_my - shifts_px[curr])) / scales[next] + shifts_px[next]
 
@@ -80,13 +101,13 @@ for curr, next in nexts {
 		} else if (my > max_y) {
 			my := max_y
 		}
-		
-		MouseMove, mx, my, 0
-		BlockInput, Mouse
-	}
+	
+		BetterMouseMove(mx, my)
+	} 
 
 	; ##### left <- right #####
-	if (prev_mx >= lefts[next] + edge_spacing && mx < lefts[next] + edge_spacing) {
+	l := lefts[next] + edge_spacing
+	if (prev_mx >= l && l > mx) {
 		mx := rights[curr] - edge_spacing
 		my := (shifts_cm[next] - shifts_cm[curr] + scales[next] * (prev_my - shifts_px[next])) / scales[curr] + shifts_px[curr]
 
@@ -97,9 +118,8 @@ for curr, next in nexts {
 		} else if (my > max_y) {
 			my := max_y
 		}
-
-		MouseMove, mx, my, 0
-		BlockInput, Mouse
+		
+		BetterMouseMove(mx, my)
 	}
 }
 
